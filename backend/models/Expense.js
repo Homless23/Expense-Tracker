@@ -10,33 +10,33 @@ const ExpenseSchema = new mongoose.Schema({
         type: String,
         required: [true, 'Please add a title'],
         trim: true,
-        maxLength: 50
+        maxlength: 50
     },
     amount: {
         type: Number,
-        required: true,
-        maxLength: 20,
-        trim: true
+        required: [true, 'Please add an amount'],
+        min: [0.01, 'Amount must be greater than zero']
     },
     type: {
         type: String,
-        default: "expense"
+        default: 'expense',
+        enum: ['expense']
     },
     date: {
         type: Date,
-        required: true,
-        trim: true
+        required: [true, 'Please add a date']
     },
     category: {
         type: String,
-        required: true,
-        trim: true
+        required: [true, 'Please add a category'],
+        trim: true,
+        maxlength: 30
     },
     description: {
         type: String,
-        required: true,
-        maxLength: 20,
-        trim: true
+        required: [true, 'Please add a description'],
+        trim: true,
+        maxlength: 200
     },
 }, { timestamps: true });
 

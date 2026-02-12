@@ -2,6 +2,7 @@ const Expense = require('../models/Expense');
 
 exports.addExpense = async (req, res) => {
     const { title, amount, category, description, date } = req.body;
+    const parsedAmount = Number(amount);
 
     const expense = Expense({
         title,
@@ -17,9 +18,11 @@ exports.addExpense = async (req, res) => {
         if (!title || !category || !description || !date) {
             return res.status(400).json({ message: 'All fields are required!' });
         }
-        if (amount <= 0 || !amount === 'number') {
+        if (!Number.isFinite(parsedAmount) || parsedAmount <= 0) {
             return res.status(400).json({ message: 'Amount must be a positive number!' });
         }
+
+        expense.amount = parsedAmount;
         
         await expense.save();
         res.status(200).json({ message: 'Expense Added' });

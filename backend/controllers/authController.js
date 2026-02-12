@@ -1,5 +1,4 @@
 const jwt = require('jsonwebtoken');
-const bcrypt = require('bcryptjs');
 const User = require('../models/User');
 
 // Generate JWT
@@ -13,14 +12,15 @@ const generateToken = (id) => {
 // @route   POST /api/auth/register
 const registerUser = async (req, res) => {
     const { name, email, password } = req.body;
+    const normalizedEmail = email?.toLowerCase().trim();
 
     try {
-        if (!name || !email || !password) {
+        if (!name || !normalizedEmail || !password) {
             return res.status(400).json({ message: 'Please add all fields' });
         }
 
         // Check if user exists
-        const userExists = await User.findOne({ email });
+        const userExists = await User.findOne({ email: normalizedEmail });
         if (userExists) {
             return res.status(400).json({ message: 'User already exists' });
         }
@@ -28,7 +28,7 @@ const registerUser = async (req, res) => {
         // Create user (password hashing is handled in Model)
         const user = await User.create({
             name,
-            email,
+            email: normalizedEmail,
             password
         });
 
@@ -52,10 +52,15 @@ const registerUser = async (req, res) => {
 // @route   POST /api/auth/login
 const loginUser = async (req, res) => {
     const { email, password } = req.body;
+    const normalizedEmail = email?.toLowerCase().trim();
 
     try {
+        if (!normalizedEmail || !password) {
+            return res.status(400).json({ message: 'Please provide email and password' });
+        }
+
         // Check for user email
-        const user = await User.findOne({ email });
+        const user = await User.findOne({ email: normalizedEmail }).select('+password');
 
         // Check password
         if (user && (await user.matchPassword(password))) {
