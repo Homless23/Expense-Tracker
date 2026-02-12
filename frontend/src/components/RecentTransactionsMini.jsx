@@ -1,5 +1,5 @@
 import React from 'react';
-import { useGlobalContext } from '../context/GlobalState';
+import { useGlobalContext } from '../context/globalContext';
 
 const RecentTransactionsMini = () => {
   const { expenses } = useGlobalContext();

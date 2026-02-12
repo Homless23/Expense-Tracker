@@ -7,7 +7,7 @@ function Home() {
 
     useEffect(() => {
         if (user) getExpenses();
-    }, [user]);
+    }, [user, getExpenses]);
 
     const handleSubmit = (e) => {
         e.preventDefault();
