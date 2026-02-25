@@ -44,8 +44,8 @@ exports.addExpense = async (req, res) => {
     const normalizedType = type === 'income' ? 'income' : 'expense';
 
     try {
-        if (!title || !category || !description || !expenseDate) {
-            return res.status(400).json({ message: 'All fields are required!' });
+        if (!title || !category || !expenseDate) {
+            return res.status(400).json({ message: 'Title, category, and date are required!' });
         }
         if (!Number.isFinite(amountNumber) || amountNumber <= 0) {
             return res.status(400).json({ message: 'Amount must be a positive number!' });
@@ -56,7 +56,7 @@ exports.addExpense = async (req, res) => {
             amount: amountNumber,
             type: normalizedType,
             category: String(category).trim(),
-            description: String(description).trim(),
+            description: String(description || '').trim(),
             date: expenseDate,
             recurring: buildRecurring(recurring),
             user: req.user.id
@@ -153,8 +153,8 @@ exports.updateExpense = async (req, res) => {
         if (!expense) return res.status(404).json({ message: 'Expense not found' });
         if (expense.user.toString() !== req.user.id) return res.status(401).json({ message: 'User not authorized' });
 
-        if (!title || !category || !description || !expenseDate) {
-            return res.status(400).json({ message: 'All fields are required!' });
+        if (!title || !category || !expenseDate) {
+            return res.status(400).json({ message: 'Title, category, and date are required!' });
         }
         if (!Number.isFinite(amountNumber) || amountNumber <= 0) {
             return res.status(400).json({ message: 'Amount must be a positive number!' });
@@ -164,7 +164,7 @@ exports.updateExpense = async (req, res) => {
         expense.amount = amountNumber;
         expense.type = normalizedType;
         expense.category = String(category).trim();
-        expense.description = String(description).trim();
+        expense.description = String(description || '').trim();
         expense.date = expenseDate;
         expense.recurring = buildRecurring(recurring);
         if (expense.recurring.enabled && normalizedType === 'expense') {

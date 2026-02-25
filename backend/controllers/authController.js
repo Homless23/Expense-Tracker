@@ -3,6 +3,21 @@ const bcrypt = require('bcryptjs');
 const User = require('../models/User');
 const LoginEvent = require('../models/LoginEvent');
 
+const MAX_AVATAR_DATA_URL_LENGTH = 1800000;
+const AVATAR_DATA_URL_PATTERN = /^data:image\/(png|jpe?g|webp|gif);base64,[a-zA-Z0-9+/=]+$/;
+
+const sanitizeAvatarDataUrl = (value) => {
+    const next = String(value || '').trim();
+    if (!next) return '';
+    if (next.length > MAX_AVATAR_DATA_URL_LENGTH) {
+        return null;
+    }
+    if (!AVATAR_DATA_URL_PATTERN.test(next)) {
+        return null;
+    }
+    return next;
+};
+
 // Generate JWT
 const generateToken = (id) => {
     if (!process.env.JWT_SECRET) {
@@ -73,6 +88,7 @@ const registerUser = async (req, res) => {
                 _id: user.id,
                 name: user.name,
                 email: user.email,
+                avatarDataUrl: user.avatarDataUrl || '',
                 role: user.role,
                 token: generateToken(user._id)
             });
@@ -109,6 +125,7 @@ const loginUser = async (req, res) => {
                 _id: user.id,
                 name: user.name,
                 email: user.email,
+                avatarDataUrl: user.avatarDataUrl || '',
                 role: user.role,
                 token: generateToken(user._id)
             });
@@ -144,6 +161,7 @@ const adminLogin = async (req, res) => {
             _id: user.id,
             name: user.name,
             email: user.email,
+            avatarDataUrl: user.avatarDataUrl || '',
             role: user.role,
             token: generateToken(user._id)
         });
@@ -158,7 +176,7 @@ const adminLogin = async (req, res) => {
 // @access  Private
 const getMe = async (req, res) => {
     try {
-        const user = await User.findById(req.user.id).select('_id name email createdAt updatedAt');
+        const user = await User.findById(req.user.id).select('_id name email avatarDataUrl createdAt updatedAt');
         if (!user) {
             return res.status(404).json({ message: 'User not found' });
         }
@@ -173,17 +191,31 @@ const getMe = async (req, res) => {
 // @route   PUT /api/auth/profile
 // @access  Private
 const updateProfile = async (req, res) => {
-    const { name } = req.body;
+    const { name, avatarDataUrl, removeAvatar } = req.body;
     const nextName = String(name || '').trim();
+    const shouldRemoveAvatar = Boolean(removeAvatar);
 
     try {
         if (!nextName) {
             return res.status(400).json({ message: 'Name is required' });
         }
+        if (nextName.length < 2 || nextName.length > 60) {
+            return res.status(400).json({ message: 'Name must be between 2 and 60 characters' });
+        }
 
         const user = await User.findById(req.user.id);
         if (!user) {
             return res.status(404).json({ message: 'User not found' });
+        }
+
+        if (shouldRemoveAvatar) {
+            user.avatarDataUrl = '';
+        } else if (typeof avatarDataUrl !== 'undefined') {
+            const cleanedAvatar = sanitizeAvatarDataUrl(avatarDataUrl);
+            if (cleanedAvatar === null) {
+                return res.status(400).json({ message: 'Invalid profile image. Use PNG, JPG, WEBP, or GIF under 1.5MB.' });
+            }
+            user.avatarDataUrl = cleanedAvatar;
         }
 
         user.name = nextName;
@@ -192,7 +224,8 @@ const updateProfile = async (req, res) => {
         return res.json({
             _id: user.id,
             name: user.name,
-            email: user.email
+            email: user.email,
+            avatarDataUrl: user.avatarDataUrl || ''
         });
     } catch (error) {
         console.log(error);

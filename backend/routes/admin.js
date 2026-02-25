@@ -6,7 +6,8 @@ const {
     getLoginEvents,
     createUserByAdmin,
     deleteUserByAdmin,
-    cleanupCategoryDuplicatesForAllUsers
+    cleanupCategoryDuplicatesForAllUsers,
+    seedRandomEntriesForAdmin
 } = require('../controllers/adminController');
 
 router.get('/users', protect, adminOnly, getUsers);
@@ -14,5 +15,6 @@ router.get('/logins', protect, adminOnly, getLoginEvents);
 router.post('/users', protect, adminOnly, createUserByAdmin);
 router.delete('/users/:id', protect, adminOnly, deleteUserByAdmin);
 router.post('/categories/cleanup-duplicates', protect, adminOnly, cleanupCategoryDuplicatesForAllUsers);
+router.post('/seed-random-entries', protect, adminOnly, seedRandomEntriesForAdmin);
 
 module.exports = router;

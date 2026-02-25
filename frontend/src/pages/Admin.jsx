@@ -9,6 +9,8 @@ const Admin = () => {
   const [users, setUsers] = useState([]);
   const [logins, setLogins] = useState([]);
   const [loading, setLoading] = useState(false);
+  const [seeding, setSeeding] = useState(false);
+  const [seedPreset, setSeedPreset] = useState('medium');
   const [newUser, setNewUser] = useState({
     name: '',
     email: '',
@@ -70,6 +72,31 @@ const Admin = () => {
     }
   };
 
+  const addRandomEntries = async () => {
+    const presetConfig = {
+      small: { expenseCount: 20, incomeCount: 6 },
+      medium: { expenseCount: 45, incomeCount: 16 },
+      large: { expenseCount: 120, incomeCount: 35 }
+    };
+    const selected = presetConfig[seedPreset] || presetConfig.medium;
+    const previewTotal = Number(selected.expenseCount || 0) + Number(selected.incomeCount || 0);
+    const confirmed = window.confirm('Add random test expenses and incomes to this admin account?');
+    if (!confirmed) return;
+    try {
+      setSeeding(true);
+      setError(null);
+      const res = await api.post('/admin/seed-random-entries', selected);
+      const total = Number(res?.data?.totalAdded || 0);
+      showToast(`Added ${total} random entries`, { type: 'success' });
+      pushNotification(`Admin seeded ${total || previewTotal} random test entries`, { type: 'info' });
+      await loadAdminData();
+    } catch (requestError) {
+      setError(requestError?.response?.data?.message || 'Failed to add random entries');
+    } finally {
+      setSeeding(false);
+    }
+  };
+
   return (
     <AppShell
       title="Admin Panel"
@@ -78,8 +105,26 @@ const Admin = () => {
       {loading ? <div className="inline-loading">Loading admin data...</div> : null}
       {error ? <div className="error-banner">{error}</div> : null}
 
-      <section className="ui-card" style={{ marginBottom: '12px' }}>
-        <h3 style={{ marginBottom: '10px' }}>Create User</h3>
+      <section className="ui-card fade-in gap-bottom">
+        <div className="section-head-row">
+          <h3>Create User</h3>
+          <div className="stack-row">
+            <select
+              className="admin-seed-select"
+              value={seedPreset}
+              onChange={(e) => setSeedPreset(e.target.value)}
+              disabled={seeding}
+            >
+              <option value="small">Small (26)</option>
+              <option value="medium">Medium (61)</option>
+              <option value="large">Large (155)</option>
+            </select>
+            <button className="btn-secondary" onClick={addRandomEntries} disabled={seeding}>
+              {seeding ? 'Adding test data...' : 'Add Random Entries'}
+            </button>
+          </div>
+        </div>
+
         <form className="form-grid cols-4" onSubmit={createUser}>
           <div className="form-field">
             <label>Name</label>
@@ -106,60 +151,64 @@ const Admin = () => {
         </form>
       </section>
 
-      <section className="ui-card" style={{ marginBottom: '12px' }}>
-        <h3 style={{ marginBottom: '8px' }}>Users</h3>
-        <table className="dashboard-table">
-          <thead>
-            <tr>
-              <th>#</th>
-              <th>Username</th>
-              <th>Role</th>
-              <th>Joined</th>
-              <th>Email</th>
-              <th />
-            </tr>
-          </thead>
-          <tbody>
-            {users.map((item, index) => (
-              <tr key={item._id}>
-                <td>{index + 1}</td>
-                <td>{item.name}</td>
-                <td>{item.role}</td>
-                <td>{new Date(item.createdAt).toLocaleDateString()}</td>
-                <td>{item.email}</td>
-                <td>
-                  <button className="btn-danger" onClick={() => removeUser(item._id)}>Delete</button>
-                </td>
+      <section className="ui-card fade-in gap-bottom">
+        <h3 className="section-heading">Users</h3>
+        <div className="table-wrap">
+          <table className="dashboard-table">
+            <thead>
+              <tr>
+                <th>#</th>
+                <th>Username</th>
+                <th>Role</th>
+                <th>Joined</th>
+                <th>Email</th>
+                <th />
               </tr>
-            ))}
-          </tbody>
-        </table>
+            </thead>
+            <tbody>
+              {users.map((item, index) => (
+                <tr key={item._id}>
+                  <td>{index + 1}</td>
+                  <td>{item.name}</td>
+                  <td>{item.role}</td>
+                  <td>{new Date(item.createdAt).toLocaleDateString()}</td>
+                  <td>{item.email}</td>
+                  <td>
+                    <button className="btn-danger" onClick={() => removeUser(item._id)}>Delete</button>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
       </section>
 
-      <section className="ui-card">
-        <h3 style={{ marginBottom: '8px' }}>Login Activity</h3>
-        <table className="dashboard-table">
-          <thead>
-            <tr>
-              <th>Email</th>
-              <th>Status</th>
-              <th>Role</th>
-              <th>IP</th>
-              <th>Time</th>
-            </tr>
-          </thead>
-          <tbody>
-            {logins.map((item) => (
-              <tr key={item._id}>
-                <td>{item.email}</td>
-                <td>{item.success ? 'Success' : 'Failed'}</td>
-                <td>{item.role}</td>
-                <td>{item.ip || '-'}</td>
-                <td>{new Date(item.createdAt).toLocaleString()}</td>
+      <section className="ui-card fade-in">
+        <h3 className="section-heading">Login Activity</h3>
+        <div className="table-wrap">
+          <table className="dashboard-table">
+            <thead>
+              <tr>
+                <th>Email</th>
+                <th>Status</th>
+                <th>Role</th>
+                <th>IP</th>
+                <th>Time</th>
               </tr>
-            ))}
-          </tbody>
-        </table>
+            </thead>
+            <tbody>
+              {logins.map((item) => (
+                <tr key={item._id}>
+                  <td>{item.email}</td>
+                  <td>{item.success ? 'Success' : 'Failed'}</td>
+                  <td>{item.role}</td>
+                  <td>{item.ip || '-'}</td>
+                  <td>{new Date(item.createdAt).toLocaleString()}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
       </section>
     </AppShell>
   );

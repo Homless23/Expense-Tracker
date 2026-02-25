@@ -1,10 +1,20 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { Bar, BarChart, CartesianGrid, Legend, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
+import { Bar, BarChart, CartesianGrid, Cell, Legend, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
 import AppShell from '../components/AppShell';
 import { useGlobalContext } from '../context/globalContext';
 import './DashboardUI.css';
 
 const Budget = () => {
+  const getUrgencyColor = (spent, budget) => {
+    const safeBudget = Number(budget || 0);
+    if (safeBudget <= 0) return '#94a3b8';
+    const ratio = Number(spent || 0) / safeBudget;
+    if (ratio >= 1) return '#ef4444';
+    if (ratio >= 0.8) return '#f97316';
+    if (ratio >= 0.6) return '#f59e0b';
+    return '#22c55e';
+  };
+
   const {
     error,
     categories,
@@ -129,9 +139,9 @@ const Budget = () => {
 
   const rightPanel = (
     <>
-      <div className="ui-card">
-        <h3>Total monthly expenditures</h3>
-        <div style={{ width: '100%', height: '220px' }}>
+      <div className="ui-card fade-in">
+        <h3 className="section-heading">Total monthly expenditures</h3>
+        <div className="chart-box h-230">
           <ResponsiveContainer>
             <BarChart data={chartData}>
               <CartesianGrid strokeDasharray="3 3" />
@@ -139,20 +149,32 @@ const Budget = () => {
               <YAxis tick={{ fontSize: 10 }} />
               <Tooltip />
               <Legend />
-              <Bar dataKey="spent" fill="#6366f1" />
+              <Bar dataKey="spent">
+                {chartData.map((entry) => (
+                  <Cell key={`spent-${entry.category}`} fill={getUrgencyColor(entry.spent, entry.budget)} />
+                ))}
+              </Bar>
               <Bar dataKey="budget" fill="#cbd5e1" />
             </BarChart>
           </ResponsiveContainer>
         </div>
       </div>
 
-      <div className="ui-card">
-        <h3>Remaining Budget</h3>
-        <div className="budget-list" style={{ marginTop: '8px' }}>
+      <div className="ui-card fade-in">
+        <h3 className="section-heading">Remaining Budget</h3>
+        <div className="budget-list mt-8">
           {budgetRows.map((row) => (
             <div key={row._id} className="budget-item">
               <strong>{row.name}</strong>
               <small>Rs.{Math.round(row.remaining).toLocaleString()} of {Math.round(row.budget || 0).toLocaleString()}</small>
+              <div className="budget-meter">
+                <span
+                  style={{
+                    width: `${Math.min((Number(row.spent || 0) / Math.max(Number(row.budget || 0), 1)) * 100, 100)}%`,
+                    background: getUrgencyColor(row.spent, row.budget)
+                  }}
+                />
+              </div>
             </div>
           ))}
         </div>
@@ -169,22 +191,22 @@ const Budget = () => {
       {loading ? <div className="inline-loading">Refreshing budget data...</div> : null}
       {error ? <div className="error-banner">{error}</div> : null}
 
-      <section className="ui-card">
-        <h3 style={{ marginBottom: '10px' }}>Category Budget</h3>
-        <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap', alignItems: 'center', marginBottom: '12px' }}>
+      <section className="ui-card fade-in">
+        <h3 className="section-heading">Category Budget</h3>
+        <div className="stack-row budget-controls">
           <input
+            className="input-md"
             type="number"
             placeholder="Monthly income (optional)"
             value={incomeOverride}
             onChange={(e) => setIncomeOverride(e.target.value)}
-            style={{ width: '220px' }}
           />
           <input
+            className="input-md"
             type="number"
             placeholder="Savings target (optional)"
             value={savingsTarget}
             onChange={(e) => setSavingsTarget(e.target.value)}
-            style={{ width: '220px' }}
           />
           <button className="btn-primary" onClick={onAutoAllocate} disabled={allocating}>
             {allocating ? 'Applying...' : 'Auto-Allocate Budgets'}
@@ -196,12 +218,13 @@ const Budget = () => {
             <button className="btn-secondary" onClick={clearPreview}>Clear Preview</button>
           ) : null}
         </div>
+
         {allocationPreview ? (
-          <div style={{ marginBottom: '12px' }}>
-            <div style={{ marginBottom: '8px', color: '#475569' }}>
+          <div className="gap-bottom">
+            <div className="budget-preview-summary">
               Income: Rs.{Math.round(allocationPreview.monthlyIncome || 0).toLocaleString()} | Savings: Rs.{Math.round(allocationPreview.savingsTarget || 0).toLocaleString()} | Spendable: Rs.{Math.round(allocationPreview.spendableBudget || 0).toLocaleString()}
             </div>
-            <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: '8px' }}>
+            <div className="budget-preview-apply">
               <button
                 className="btn-primary"
                 onClick={async () => {
@@ -213,77 +236,82 @@ const Budget = () => {
                 {allocating ? 'Applying...' : 'Apply These Suggestions'}
               </button>
             </div>
-            <table className="dashboard-table">
-              <thead>
-                <tr>
-                  <th>Category</th>
-                  <th>Current</th>
-                  <th>Suggested</th>
-                  <th>Delta</th>
-                  <th>Weight</th>
-                </tr>
-              </thead>
-              <tbody>
-                {(allocationPreview.suggestions || []).map((item) => {
-                  const delta = Number(item.suggestedBudget || 0) - Number(item.currentBudget || 0);
-                  return (
-                    <tr key={item._id}>
-                      <td>{item.name}</td>
-                      <td>Rs.{Math.round(item.currentBudget || 0).toLocaleString()}</td>
-                      <td>Rs.{Math.round(item.suggestedBudget || 0).toLocaleString()}</td>
-                      <td style={{ color: delta >= 0 ? '#166534' : '#b91c1c' }}>
-                        {delta >= 0 ? '+' : ''}Rs.{Math.round(delta).toLocaleString()}
-                      </td>
-                      <td>{Number(item.weightPercent || 0).toFixed(2)}%</td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
+            <div className="table-wrap">
+              <table className="dashboard-table">
+                <thead>
+                  <tr>
+                    <th>Category</th>
+                    <th>Current</th>
+                    <th>Suggested</th>
+                    <th>Delta</th>
+                    <th>Weight</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {(allocationPreview.suggestions || []).map((item) => {
+                    const delta = Number(item.suggestedBudget || 0) - Number(item.currentBudget || 0);
+                    return (
+                      <tr key={item._id}>
+                        <td>{item.name}</td>
+                        <td>Rs.{Math.round(item.currentBudget || 0).toLocaleString()}</td>
+                        <td>Rs.{Math.round(item.suggestedBudget || 0).toLocaleString()}</td>
+                        <td style={{ color: delta >= 0 ? '#166534' : '#b91c1c' }}>
+                          {delta >= 0 ? '+' : ''}Rs.{Math.round(delta).toLocaleString()}
+                        </td>
+                        <td>{Number(item.weightPercent || 0).toFixed(2)}%</td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
           </div>
         ) : null}
-        <table className="dashboard-table">
-          <thead>
-            <tr>
-              <th>Category</th>
-              <th>Last Updated</th>
-              <th>Budget</th>
-              <th>Spent</th>
-              <th />
-            </tr>
-          </thead>
-          <tbody>
-            {budgetRows.map((row) => (
-              <tr key={row._id}>
-                <td>{row.name}</td>
-                <td>{new Date(row.date || row.updatedAt || Date.now()).toLocaleDateString()}</td>
-                <td>
-                  {editingBudgetId === row._id ? (
-                    <div style={{ display: 'flex', gap: '6px' }}>
-                      <input
-                        type="number"
-                        value={editingValue}
-                        onChange={(e) => setEditingValue(e.target.value)}
-                        style={{ width: '90px' }}
-                      />
-                      <button className="btn-primary" onClick={() => onSaveBudget(row)}>Save</button>
-                    </div>
-                  ) : (
-                    <>Rs.{Number(row.budget || 0).toLocaleString()}</>
-                  )}
-                </td>
-                <td>Rs.{Math.round(row.spent).toLocaleString()}</td>
-                <td>
-                  <div className="inline-actions">
-                    <button className="btn-secondary" onClick={() => onStartEdit(row)}>Edit</button>
-                    <button className="btn-secondary" onClick={() => onRename(row)}>Rename</button>
-                    <button className="btn-danger" onClick={() => onDelete(row._id)}>Delete</button>
-                  </div>
-                </td>
+
+        <div className="table-wrap">
+          <table className="dashboard-table">
+            <thead>
+              <tr>
+                <th>Category</th>
+                <th>Last Updated</th>
+                <th>Budget</th>
+                <th>Spent</th>
+                <th />
               </tr>
-            ))}
-          </tbody>
-        </table>
+            </thead>
+            <tbody>
+              {budgetRows.map((row) => (
+                <tr key={row._id}>
+                  <td>{row.name}</td>
+                  <td>{new Date(row.date || row.updatedAt || Date.now()).toLocaleDateString()}</td>
+                  <td>
+                    {editingBudgetId === row._id ? (
+                      <div className="budget-inline-edit">
+                        <input
+                          className="input-md"
+                          type="number"
+                          value={editingValue}
+                          onChange={(e) => setEditingValue(e.target.value)}
+                        />
+                        <button className="btn-primary" onClick={() => onSaveBudget(row)}>Save</button>
+                      </div>
+                    ) : (
+                      <>Rs.{Number(row.budget || 0).toLocaleString()}</>
+                    )}
+                  </td>
+                  <td>Rs.{Math.round(row.spent).toLocaleString()}</td>
+                  <td>
+                    <div className="inline-actions">
+                      <button className="btn-secondary" onClick={() => onStartEdit(row)}>Edit</button>
+                      <button className="btn-secondary" onClick={() => onRename(row)}>Rename</button>
+                      <button className="btn-danger" onClick={() => onDelete(row._id)}>Delete</button>
+                    </div>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
       </section>
     </AppShell>
   );

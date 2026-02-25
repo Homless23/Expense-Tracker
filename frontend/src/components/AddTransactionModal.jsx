@@ -70,9 +70,9 @@ const AddTransactionModal = ({ isOpen, onClose, onSuccess }) => {
   };
 
   const modalContent = (
-    <div className="wizard-overlay">
-      <div className="wizard-card">
-        <h3 style={{ marginTop: 0, marginBottom: '0.8rem' }}>Add Expense</h3>
+    <div className="wizard-overlay transaction-modal-overlay">
+      <div className="wizard-card transaction-modal">
+        <h3 className="modal-title">Add Transaction</h3>
         {error && <div className="alert-error">{error}</div>}
 
         <form className="stacked-form" onSubmit={submit}>
@@ -122,10 +122,10 @@ const AddTransactionModal = ({ isOpen, onClose, onSuccess }) => {
             <input className="input" type="date" value={form.date} required onChange={(e) => setForm((p) => ({ ...p, date: e.target.value }))} />
           </div>
 
-          <input className="input" placeholder="Description" value={form.description} required onChange={(e) => setForm((p) => ({ ...p, description: e.target.value }))} />
+          <input className="input" placeholder="Description (optional)" value={form.description} onChange={(e) => setForm((p) => ({ ...p, description: e.target.value }))} />
 
           {form.type === 'expense' && (
-            <div className="row">
+            <div className="row recurring-row">
               <label className="check-wrap">
                 <input
                   type="checkbox"

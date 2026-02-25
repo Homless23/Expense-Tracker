@@ -56,7 +56,7 @@ const ensureAdminUser = async () => {
 ensureAdminUser();
 
 // Middleware
-app.use(express.json());
+app.use(express.json({ limit: '3mb' }));
 app.use(cors());
 
 // Health check endpoint for quick runtime verification

@@ -4,6 +4,14 @@ import { useGlobalContext } from '../context/globalContext';
 import './DashboardUI.css';
 
 const Categories = () => {
+  const getUrgencyColorByPercent = (percentValue) => {
+    const p = Number(percentValue || 0);
+    if (p >= 100) return '#ef4444';
+    if (p >= 80) return '#f97316';
+    if (p >= 60) return '#f59e0b';
+    return '#22c55e';
+  };
+
   const {
     error,
     loading,
@@ -104,7 +112,12 @@ const Categories = () => {
                 <td>
                   <div className="categories-progress">
                     <div className="budget-meter categories-meter">
-                      <span style={{ width: `${Math.min(row.expensePercent || 0, 100)}%` }} />
+                      <span
+                        style={{
+                          width: `${Math.min(row.expensePercent || 0, 100)}%`,
+                          background: getUrgencyColorByPercent(row.expensePercent)
+                        }}
+                      />
                     </div>
                     <span>{Math.round(row.expensePercent || 0)}%</span>
                   </div>

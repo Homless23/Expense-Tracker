@@ -4,10 +4,11 @@
   "version": "1.0.0",
   "description": "",
   "main": "server.js",
-"scripts": {
+  "scripts": {
     "start": "node server.js",
     "dev": "node server.js",
-    "cleanup:categories": "node scripts/cleanupCategoryDuplicates.js"
+    "cleanup:categories": "node scripts/cleanupCategoryDuplicates.js",
+    "seed:transactions": "node scripts/seedRandomTransactions.js"
   },
   "keywords": [],
   "author": "",

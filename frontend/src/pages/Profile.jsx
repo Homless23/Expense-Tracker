@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import AppShell from '../components/AppShell';
 import { useGlobalContext } from '../context/globalContext';
 import './DashboardUI.css';
@@ -50,24 +50,22 @@ const Profile = () => {
     loadProfile();
   }, [getCurrentUser, user]);
 
-  const initials = useMemo(() => {
-    const raw = String(profile.name || user?.name || 'U').trim();
-    if (!raw) return 'U';
-    const parts = raw.split(/\s+/).filter(Boolean);
-    if (parts.length === 1) return parts[0][0].toUpperCase();
-    return `${parts[0][0]}${parts[1][0]}`.toUpperCase();
-  }, [profile.name, user]);
-
-  const onSaveName = async (event) => {
+  const onSaveProfile = async (event) => {
     event.preventDefault();
+    setLocalError('');
     const cleaned = String(nameInput || '').trim();
     if (!cleaned) return;
 
     setIsSavingName(true);
-    const result = await updateProfile({ name: cleaned });
+    const payload = {
+      name: cleaned
+    };
+    const result = await updateProfile(payload);
     setIsSavingName(false);
     if (!result.success) return;
-    setProfile((prev) => ({ ...prev, name: cleaned }));
+    setProfile((prev) => ({
+      ...prev, name: cleaned
+    }));
   };
 
   const onSavePassword = async (event) => {
@@ -89,6 +87,7 @@ const Profile = () => {
     if (!result.success) return;
     setPasswordForm({ currentPassword: '', newPassword: '', confirmPassword: '' });
   };
+  const profileInitial = String(nameInput || profile.name || user?.name || 'U').trim().charAt(0).toUpperCase() || 'U';
 
   return (
     <AppShell
@@ -100,7 +99,9 @@ const Profile = () => {
 
       <section className="profile-grid">
         <aside className="ui-card profile-side-card">
-          <div className="profile-avatar">{initials}</div>
+          <div className="profile-avatar-wrap">
+            <div className="profile-avatar">{profileInitial}</div>
+          </div>
           <h3>{profile.name || 'User'}</h3>
           <p>{profile.email || '-'}</p>
           <small className="muted">
@@ -110,8 +111,8 @@ const Profile = () => {
 
         <div className="profile-main-stack">
           <article className="ui-card">
-            <h3 style={{ marginBottom: '10px' }}>Account</h3>
-            <form className="form-grid cols-2" onSubmit={onSaveName}>
+            <h3 className="section-heading">Account</h3>
+            <form className="form-grid cols-2" onSubmit={onSaveProfile}>
               <div className="form-field">
                 <label>Display Name</label>
                 <input
@@ -133,7 +134,7 @@ const Profile = () => {
           </article>
 
           <article className="ui-card">
-            <h3 style={{ marginBottom: '10px' }}>Security</h3>
+            <h3 className="section-heading">Security</h3>
             <form className="form-grid cols-2" onSubmit={onSavePassword}>
               <div className="form-field">
                 <label>Current Password</label>
@@ -164,7 +165,7 @@ const Profile = () => {
                   required
                 />
               </div>
-              <div style={{ alignSelf: 'end' }}>
+              <div className="align-end">
                 <button className="btn-primary" type="submit" disabled={isSavingPassword}>
                   {isSavingPassword ? 'Updating...' : 'Update Password'}
                 </button>

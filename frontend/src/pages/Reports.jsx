@@ -1,8 +1,10 @@
 import React, { useEffect, useMemo, useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import {
+  Area,
+  AreaChart,
   CartesianGrid,
-  Line,
-  LineChart,
+  Legend,
   PolarAngleAxis,
   PolarGrid,
   Radar,
@@ -13,13 +15,17 @@ import {
   YAxis
 } from 'recharts';
 import AppShell from '../components/AppShell';
+import ChartCard from '../components/ui/ChartCard';
+import EmptyState from '../components/ui/EmptyState';
 import { useGlobalContext } from '../context/globalContext';
 import './DashboardUI.css';
 
 const Reports = () => {
   const { loading, expenses, categories, getData } = useGlobalContext();
+  const [searchParams, setSearchParams] = useSearchParams();
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
+  const categoryFilter = searchParams.get('category') || '';
 
   useEffect(() => {
     getData();
@@ -33,15 +39,25 @@ const Reports = () => {
       const key = date.toISOString().slice(0, 10);
       if (startDate && key < startDate) return false;
       if (endDate && key > endDate) return false;
+      if (categoryFilter && String(item.category || '') !== categoryFilter) return false;
       return true;
     });
-  }, [endDate, expenses, startDate]);
+  }, [categoryFilter, endDate, expenses, startDate]);
+
+  const categoryOptions = useMemo(() => {
+    const allNames = [
+      ...categories.map((item) => String(item.name || '').trim()),
+      ...expenseItems.map((item) => String(item.category || '').trim())
+    ].filter(Boolean);
+    return [...new Set(allNames)].sort((a, b) => a.localeCompare(b));
+  }, [categories, expenseItems]);
 
   const thisMonthDailyTrend = useMemo(() => {
     const now = new Date();
     const currentMonth = now.getMonth();
     const currentYear = now.getFullYear();
     const byDay = {};
+
     expenseItems.forEach((item) => {
       const date = new Date(item.date);
       if (Number.isNaN(date.getTime())) return;
@@ -71,9 +87,23 @@ const Reports = () => {
       const spent = expenseItems
         .filter((item) => item.category === category.name)
         .reduce((sum, item) => sum + Number(item.amount || 0), 0);
-      return { name: category.name, spent, budget: Number(category.budget || 0), allocation: Number(category.budget || 0) };
+      return {
+        name: category.name,
+        spent,
+        budget: Number(category.budget || 0),
+        allocation: Number(category.budget || 0)
+      };
     });
   }, [categories, expenseItems]);
+
+  const radarData = useMemo(() => {
+    const incomeLike = new Set(['salary', 'freelance', 'investments', 'bonus']);
+    return categoryData
+      .filter((item) => Number(item.allocation || 0) > 0)
+      .filter((item) => !incomeLike.has(String(item.name || '').toLowerCase()))
+      .sort((a, b) => Number(b.allocation || 0) - Number(a.allocation || 0))
+      .slice(0, 7);
+  }, [categoryData]);
 
   const totals = useMemo(() => {
     const todayKey = new Date().toISOString().slice(0, 10);
@@ -83,13 +113,18 @@ const Reports = () => {
       const key = new Date(item.date).toISOString().slice(0, 10);
       return key === todayKey ? sum + Number(item.amount || 0) : sum;
     }, 0);
-    const totalBudgetAllocated = totalBudget;
-    return { totalBudget, totalBudgetAllocated, totalExpenditure, expenditureToday };
+    return {
+      totalBudget,
+      totalBudgetAllocated: totalBudget,
+      totalExpenditure,
+      expenditureToday
+    };
   }, [categoryData, expenseItems]);
 
   const categoriesToday = useMemo(() => {
     const todayKey = new Date().toISOString().slice(0, 10);
     const spentMap = {};
+
     expenseItems.forEach((item) => {
       const key = new Date(item.date).toISOString().slice(0, 10);
       if (key !== todayKey) return;
@@ -136,7 +171,7 @@ const Reports = () => {
     >
       {loading ? <div className="inline-loading">Refreshing reports...</div> : null}
       <section className="reports-layout">
-        <div className="ui-card reports-main-card">
+        <div className="ui-card reports-main-card fade-in">
           <div className="reports-toolbar">
             <h3>Reports</h3>
             <div className="reports-filters">
@@ -148,53 +183,95 @@ const Reports = () => {
                 End date
                 <input type="date" value={endDate} onChange={(e) => setEndDate(e.target.value)} />
               </label>
+              <label>
+                Category
+                <select
+                  value={categoryFilter}
+                  onChange={(e) => {
+                    const next = new URLSearchParams(searchParams);
+                    if (e.target.value) {
+                      next.set('category', e.target.value);
+                    } else {
+                      next.delete('category');
+                    }
+                    setSearchParams(next);
+                  }}
+                >
+                  <option value="">All Categories</option>
+                  {categoryOptions.map((name) => (
+                    <option key={name} value={name}>{name}</option>
+                  ))}
+                </select>
+              </label>
               <button className="btn-primary" onClick={exportFiltered}>Export</button>
             </div>
           </div>
 
           <div className="reports-chart-grid">
-            <div className="reports-chart-item">
-              <h4>Expenses Today</h4>
+            <ChartCard title="Expenses Today">
               <div className="reports-chart-wrap">
                 <ResponsiveContainer>
-                  <LineChart data={thisMonthDailyTrend}>
+                  <AreaChart data={thisMonthDailyTrend}>
                     <CartesianGrid strokeDasharray="2 2" />
                     <XAxis dataKey="label" tick={{ fontSize: 10 }} />
                     <YAxis tick={{ fontSize: 10 }} />
-                    <Tooltip />
-                    <Line dataKey="amount" stroke="#6b6eff" strokeWidth={2} dot={false} />
-                  </LineChart>
+                    <Tooltip formatter={(value) => [`Rs.${Math.round(Number(value || 0)).toLocaleString()}`, 'Amount']} />
+                    <Legend />
+                    <Area
+                      type="monotone"
+                      dataKey="amount"
+                      stroke="#6366f1"
+                      fill="#c7d2fe"
+                      fillOpacity={0.6}
+                      strokeWidth={2.2}
+                      isAnimationActive
+                      animationDuration={700}
+                    />
+                  </AreaChart>
                 </ResponsiveContainer>
               </div>
-            </div>
+            </ChartCard>
 
-            <div className="reports-chart-item">
-              <h4>Expenses Monthly</h4>
+            <ChartCard title="Expenses Monthly">
               <div className="reports-chart-wrap">
                 <ResponsiveContainer>
-                  <LineChart data={monthlyTrend}>
+                  <AreaChart data={monthlyTrend}>
                     <CartesianGrid strokeDasharray="2 2" />
                     <XAxis dataKey="month" tick={{ fontSize: 10 }} />
                     <YAxis tick={{ fontSize: 10 }} />
-                    <Tooltip />
-                    <Line dataKey="amount" stroke="#6b6eff" strokeWidth={2} dot={false} />
-                  </LineChart>
+                    <Tooltip formatter={(value) => [`Rs.${Math.round(Number(value || 0)).toLocaleString()}`, 'Amount']} />
+                    <Legend />
+                    <Area
+                      type="monotone"
+                      dataKey="amount"
+                      stroke="#4f46e5"
+                      fill="#c4b5fd"
+                      fillOpacity={0.48}
+                      strokeWidth={2.2}
+                      isAnimationActive
+                      animationDuration={760}
+                    />
+                  </AreaChart>
                 </ResponsiveContainer>
               </div>
-            </div>
+            </ChartCard>
           </div>
 
           <div className="reports-radar-block">
             <h4>Budget Allocations</h4>
             <div className="reports-radar-wrap">
-              <ResponsiveContainer>
-                <RadarChart data={categoryData}>
-                  <PolarGrid />
-                  <PolarAngleAxis dataKey="name" tick={{ fontSize: 10 }} />
-                  <Tooltip />
-                  <Radar dataKey="allocation" stroke="#6b6eff" fill="#6b6eff" fillOpacity={0.35} />
-                </RadarChart>
-              </ResponsiveContainer>
+              {radarData.length ? (
+                <ResponsiveContainer>
+                  <RadarChart data={radarData} outerRadius="78%">
+                    <PolarGrid />
+                    <PolarAngleAxis dataKey="name" tick={{ fontSize: 11 }} />
+                    <Tooltip formatter={(value) => [`Rs.${Math.round(Number(value || 0)).toLocaleString()}`, 'Allocation']} />
+                    <Radar dataKey="allocation" stroke="#6b6eff" fill="#6b6eff" fillOpacity={0.32} />
+                  </RadarChart>
+                </ResponsiveContainer>
+              ) : (
+                <EmptyState title="No allocation data" description="Set category budgets to view radar allocation." />
+              )}
             </div>
           </div>
         </div>
@@ -226,7 +303,12 @@ const Reports = () => {
                   <small>Budget: {Math.round(item.budget).toLocaleString()}</small>
                   <small>Expense: {Math.round(item.spent).toLocaleString()}</small>
                 </div>
-              )) : <p className="empty-hint">No expenses recorded for today.</p>}
+              )) : (
+                <EmptyState
+                  title="No expenses today"
+                  description="Today-wise category breakdown will appear once you add expenses."
+                />
+              )}
             </div>
           </div>
         </aside>

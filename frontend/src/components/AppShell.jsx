@@ -1,20 +1,31 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { NavLink, useNavigate } from 'react-router-dom';
-import { FiBarChart2, FiBell, FiCreditCard, FiDollarSign, FiFileText, FiGrid, FiLayers } from 'react-icons/fi';
+import { FiBarChart2, FiBell, FiCreditCard, FiDollarSign, FiFileText, FiGrid, FiLayers, FiMenu, FiMoreVertical, FiX } from 'react-icons/fi';
 import { useGlobalContext } from '../context/globalContext';
+import AddTransactionModal from './AddTransactionModal';
+import { getInitials } from '../utils/avatar';
 
 const AppShell = ({ title, subtitle, children, rightPanel = null }) => {
   const navigate = useNavigate();
   const { user, expenses, notifications, markNotificationsRead, logoutUser } = useGlobalContext();
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [isNotifOpen, setIsNotifOpen] = useState(false);
+  const [isAddModalOpen, setIsAddModalOpen] = useState(false);
+  const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(() => {
+    try {
+      return localStorage.getItem('sidebar_collapsed') === 'true';
+    } catch {
+      return false;
+    }
+  });
+  const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
   const menuRef = useRef(null);
   const notifRef = useRef(null);
   const navItems = useMemo(() => {
     const base = [
       { to: '/dashboard', label: 'Dashboard', icon: <FiGrid /> },
       { to: '/transactions', label: 'Transactions', icon: <FiCreditCard /> },
-      { to: '/add', label: 'Add Expense', icon: <FiDollarSign /> },
+      { action: 'open-add', label: 'Add Expense', icon: <FiDollarSign /> },
       { to: '/budget', label: 'Budget', icon: <FiBarChart2 /> },
       { to: '/categories', label: 'Categories', icon: <FiLayers /> },
       { to: '/reports', label: 'Reports', icon: <FiFileText /> }
@@ -25,13 +36,7 @@ const AppShell = ({ title, subtitle, children, rightPanel = null }) => {
     return base;
   }, [user?.role]);
 
-  const initials = useMemo(() => {
-    const rawName = String(user?.name || '').trim();
-    if (!rawName) return 'U';
-    const parts = rawName.split(/\s+/).filter(Boolean);
-    if (parts.length === 1) return parts[0].slice(0, 1).toUpperCase();
-    return `${parts[0][0]}${parts[1][0]}`.toUpperCase();
-  }, [user]);
+  const initials = useMemo(() => getInitials(user?.name || 'User'), [user?.name]);
 
   const todayAlerts = useMemo(() => {
     const todayKey = new Date().toISOString().slice(0, 10);
@@ -57,27 +62,76 @@ const AppShell = ({ title, subtitle, children, rightPanel = null }) => {
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
+  useEffect(() => {
+    localStorage.setItem('sidebar_collapsed', String(isSidebarCollapsed));
+  }, [isSidebarCollapsed]);
+
   return (
-    <div className="dashboard-ui-shell">
-      <aside className="dashboard-sidebar">
-        <div className="dashboard-brand">EXPENSE TRACKER</div>
+    <div className={`dashboard-ui-shell ${isSidebarCollapsed ? 'sidebar-collapsed' : ''}`}>
+      <aside className={`dashboard-sidebar ${isMobileSidebarOpen ? 'open' : ''}`}>
+        <div className="dashboard-brand-row">
+          <button
+            type="button"
+            className="sidebar-toggle"
+            onClick={() => setIsSidebarCollapsed((prev) => !prev)}
+            aria-label="Toggle sidebar"
+          >
+            <FiMenu />
+          </button>
+          <div className="dashboard-brand">EXPENSE TRACKER</div>
+        </div>
+        <button
+          type="button"
+          className="sidebar-close-mobile"
+          onClick={() => setIsMobileSidebarOpen(false)}
+          aria-label="Close menu"
+        >
+          <FiX />
+        </button>
         <nav className="dashboard-nav">
           {navItems.map((item) => (
-            <NavLink
-              key={item.to}
-              to={item.to}
-              className={({ isActive }) => `dashboard-nav-link ${isActive ? 'active' : ''}`}
-            >
-              <span>{item.icon}</span>
-              {item.label}
-            </NavLink>
+            item.to ? (
+              <NavLink
+                key={item.to}
+                to={item.to}
+                className={({ isActive }) => `dashboard-nav-link ${isActive ? 'active' : ''}`}
+                onClick={() => setIsMobileSidebarOpen(false)}
+              >
+                <span>{item.icon}</span>
+                {!isSidebarCollapsed ? item.label : null}
+              </NavLink>
+            ) : (
+              <button
+                key={item.action}
+                type="button"
+                className="dashboard-nav-link dashboard-nav-btn"
+                onClick={() => {
+                  setIsAddModalOpen(true);
+                  setIsMobileSidebarOpen(false);
+                }}
+              >
+                <span>{item.icon}</span>
+                {!isSidebarCollapsed ? item.label : null}
+              </button>
+            )
           ))}
         </nav>
       </aside>
+      {isMobileSidebarOpen ? <button className="sidebar-backdrop" onClick={() => setIsMobileSidebarOpen(false)} /> : null}
 
       <section className="dashboard-main">
         <header className="dashboard-topbar">
           <div>
+            <div className="topbar-actions">
+              <button
+                type="button"
+                className="sidebar-toggle mobile"
+                onClick={() => setIsMobileSidebarOpen(true)}
+                aria-label="Open sidebar"
+              >
+                <FiMenu />
+              </button>
+            </div>
             <h1>{title}</h1>
             {subtitle ? <p>{subtitle}</p> : null}
           </div>
@@ -125,10 +179,12 @@ const AppShell = ({ title, subtitle, children, rightPanel = null }) => {
                 aria-expanded={isMenuOpen}
               >
                 <div className="user-chip">
-                  <strong>{initials}</strong>
+                  <strong className="user-chip-avatar">
+                    <span>{initials}</span>
+                  </strong>
                   <div>
                     <span>{user?.name || 'User'}</span>
-                    <small>User</small>
+                    <small>{user?.role || 'user'}</small>
                   </div>
                 </div>
               </button>
@@ -158,6 +214,14 @@ const AppShell = ({ title, subtitle, children, rightPanel = null }) => {
                 </div>
               ) : null}
             </div>
+            <button
+              type="button"
+              className="profile-menu-trigger topbar-more-btn"
+              aria-label="More options"
+              title="More options"
+            >
+              <FiMoreVertical />
+            </button>
           </div>
         </header>
 
@@ -166,6 +230,10 @@ const AppShell = ({ title, subtitle, children, rightPanel = null }) => {
           {rightPanel ? <aside>{rightPanel}</aside> : null}
         </div>
       </section>
+      <AddTransactionModal
+        isOpen={isAddModalOpen}
+        onClose={() => setIsAddModalOpen(false)}
+      />
     </div>
   );
 };

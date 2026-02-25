@@ -1,30 +1,29 @@
 import React, { useEffect, useMemo } from 'react';
-import { Bar, BarChart, CartesianGrid, Legend, Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis, PieChart, Pie, Cell } from 'recharts';
+import { Bar, BarChart, CartesianGrid, Legend, Pie, PieChart, ResponsiveContainer, Tooltip, XAxis, YAxis, Cell } from 'recharts';
+import { useNavigate } from 'react-router-dom';
 import AppShell from '../components/AppShell';
 import { useGlobalContext } from '../context/globalContext';
+import KpiCard from '../components/ui/KpiCard';
+import ChartCard from '../components/ui/ChartCard';
+import EmptyState from '../components/ui/EmptyState';
+import { exportExpensesToCSV } from '../utils/export';
 import './DashboardUI.css';
 
-const PIE_COLORS = ['#6366f1', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#06b6d4', '#84cc16'];
+const PIE_COLORS = ['#94a3b8', '#64748b', '#cbd5e1', '#475569', '#e2e8f0', '#334155', '#0f172a'];
 
 const Home = () => {
+  const navigate = useNavigate();
   const {
     user,
     expenses,
     categories,
-    goals,
     insights,
     recurringAlerts,
     loading,
     error,
     getData,
-    createGoal,
-    updateGoal,
-    deleteGoal,
     processRecurringDue
   } = useGlobalContext();
-  const [goalTitle, setGoalTitle] = React.useState('');
-  const [goalTarget, setGoalTarget] = React.useState('');
-  const [goalDeadline, setGoalDeadline] = React.useState('');
 
   useEffect(() => {
     getData();
@@ -61,7 +60,16 @@ const Home = () => {
         const current = currentByCategory[categoryName] || 0;
         const previous = prevByCategory[categoryName] || 0;
         const change = previous > 0 ? ((current - previous) / previous) * 100 : 100;
-        return { categoryName, current, change };
+        const diff = Math.abs(current - previous);
+        return {
+          categoryName,
+          current,
+          change,
+          previous,
+          deltaLabel: previous > 0
+            ? `${Math.round(diff).toLocaleString()} ${current >= previous ? 'more' : 'less'}`
+            : 'N/A'
+        };
       })
       .sort((a, b) => b.current - a.current)
       .slice(0, 4);
@@ -97,6 +105,8 @@ const Home = () => {
     return Object.keys(totals).map((name) => ({ name, value: totals[name] }));
   }, [expenseItems]);
 
+  const totalPie = useMemo(() => pieData.reduce((sum, item) => sum + Number(item.value || 0), 0), [pieData]);
+
   const chartByCategory = useMemo(() => {
     return (categories || []).map((category) => {
       const spent = expenseItems
@@ -110,24 +120,11 @@ const Home = () => {
     });
   }, [categories, expenseItems]);
 
-  const onCreateGoal = async (event) => {
-    event.preventDefault();
-    const payload = {
-      title: goalTitle.trim(),
-      targetAmount: Number(goalTarget),
-      deadline: goalDeadline || null
-    };
-    if (!payload.title || !Number.isFinite(payload.targetAmount) || payload.targetAmount <= 0) return;
-    const result = await createGoal(payload);
-    if (!result.success) return;
-    setGoalTitle('');
-    setGoalTarget('');
-    setGoalDeadline('');
-  };
-
-  const addGoalProgress = async (goal, amount) => {
-    const nextAmount = Number(goal.currentAmount || 0) + amount;
-    await updateGoal(goal._id, { currentAmount: nextAmount });
+  const exportDashboard = () => {
+    exportExpensesToCSV(
+      expenseItems,
+      `dashboard_expenses_${new Date().toISOString().slice(0, 10)}.csv`
+    );
   };
 
   return (
@@ -139,87 +136,123 @@ const Home = () => {
       {error ? <div className="error-banner">{error}</div> : null}
 
       <section className="dashboard-home-grid">
-        <div className="ui-card">
-          <h3 style={{ marginBottom: '10px' }}>Top Expense Categories</h3>
+        <div className="ui-card fade-in">
+          <h3 className="section-heading">Top Expense Categories</h3>
           <div className="dashboard-kpi-grid">
             {summaryCards.length ? summaryCards.map((item) => (
-              <article key={item.categoryName} className="kpi-card">
-                <span>{item.categoryName} Expense</span>
-                <strong>{Math.round(item.current)}</strong>
-                <p>
-                  {item.change >= 0 ? '+' : ''}
-                  {item.change.toFixed(1)}% from last month
-                </p>
-              </article>
-            )) : <p className="empty-hint">No category spending data yet.</p>}
+              <KpiCard
+                key={item.categoryName}
+                title={`${item.categoryName} Expense`}
+                value={Math.round(item.current).toLocaleString()}
+                trend={item.change}
+                meta={item.deltaLabel}
+                onViewReport={() => navigate(`/reports?category=${encodeURIComponent(item.categoryName)}`)}
+              />
+            )) : <EmptyState title="No spending yet" description="Your category trends will appear once transactions are added." />}
           </div>
         </div>
 
-        <div className="ui-card">
-          <h3>Total Expenditure</h3>
-          <div style={{ width: '100%', height: '230px' }}>
+        <ChartCard
+          title="Total Expenditure"
+          actions={(
+            <button type="button" className="btn-primary shell-top-btn" onClick={exportDashboard}>
+              Export
+            </button>
+          )}
+        >
+          <div className="chart-box h-230">
             <ResponsiveContainer>
-              <LineChart data={weeklyChartData}>
-                <CartesianGrid strokeDasharray="3 3" />
+              <BarChart data={weeklyChartData}>
+                <CartesianGrid strokeDasharray="1 0" stroke="#e5e7eb" />
                 <XAxis dataKey="date" tick={{ fontSize: 10 }} />
                 <YAxis tick={{ fontSize: 10 }} />
                 <Tooltip />
-                <Legend />
-                <Line type="monotone" dataKey="amount" stroke="#6366f1" strokeWidth={2} />
-              </LineChart>
+                <Bar
+                  dataKey="amount"
+                  name="Expenses"
+                  fill="#64748b"
+                />
+              </BarChart>
             </ResponsiveContainer>
           </div>
-        </div>
+        </ChartCard>
       </section>
 
       <section className="dashboard-home-grid">
-        <div className="ui-card">
-          <h3 style={{ marginBottom: '8px' }}>Recent Transactions</h3>
-          <table className="dashboard-table">
-            <thead>
-              <tr>
-                <th>Expense</th>
-                <th>Amount</th>
-                <th>Category</th>
-                <th>Date &amp; Time</th>
-              </tr>
-            </thead>
-            <tbody>
-              {recentTransactions.map((item) => (
-                <tr key={item._id}>
-                  <td>{item.title}</td>
-                  <td>{item.type === 'income' ? '+' : '-'}{Number(item.amount || 0).toLocaleString()}</td>
-                  <td>{item.category}</td>
-                  <td>{new Date(item.date).toLocaleString()}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+        <div className="ui-card fade-in">
+          <h3 className="section-heading">Recent Transactions</h3>
+          {recentTransactions.length ? (
+            <div className="table-wrap">
+              <table className="dashboard-table">
+                <thead>
+                  <tr>
+                    <th>Expense</th>
+                    <th>Amount</th>
+                    <th>Category</th>
+                    <th>Date &amp; Time</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {recentTransactions.map((item) => (
+                    <tr key={item._id}>
+                      <td>{item.title}</td>
+                      <td>
+                        <span className={item.type === 'income' ? 'amount-income' : 'amount-expense'}>
+                          {item.type === 'income' ? '+' : '-'}{Number(item.amount || 0).toLocaleString()}
+                        </span>
+                      </td>
+                      <td>{item.category}</td>
+                      <td>{new Date(item.date).toLocaleString()}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          ) : (
+            <EmptyState title="No recent transactions" description="Your latest transaction list will appear here." />
+          )}
         </div>
 
-        <div className="ui-card">
-          <h3>Category Split</h3>
-          <div style={{ width: '100%', height: '250px' }}>
+        <div className="ui-card fade-in">
+          <h3 className="section-heading">Category Split</h3>
+          <div className="chart-box h-250">
             <ResponsiveContainer>
               <PieChart>
-                <Pie data={pieData} dataKey="value" nameKey="name" innerRadius={35} outerRadius={85}>
+                <Pie
+                  data={pieData}
+                  dataKey="value"
+                  nameKey="name"
+                  outerRadius={80}
+                  label={false}
+                  isAnimationActive={false}
+                >
                   {pieData.map((entry, index) => (
                     <Cell key={entry.name} fill={PIE_COLORS[index % PIE_COLORS.length]} />
                   ))}
                 </Pie>
-                <Tooltip />
+                <Tooltip
+                  formatter={(value, _name, ctx) => {
+                    const pct = totalPie > 0 ? ((Number(value || 0) / totalPie) * 100).toFixed(1) : '0.0';
+                    return [`Rs ${Number(value || 0).toLocaleString()} (${pct}%)`, String(ctx?.payload?.name || 'Spent')];
+                  }}
+                />
+                <Legend
+                  verticalAlign="bottom"
+                  align="center"
+                  wrapperStyle={{ fontSize: 12, paddingTop: 8 }}
+                />
               </PieChart>
             </ResponsiveContainer>
           </div>
-          <div style={{ width: '100%', height: '210px' }}>
+          <div className="chart-box h-210">
             <ResponsiveContainer>
               <BarChart data={chartByCategory}>
-                <CartesianGrid strokeDasharray="3 3" />
+                <CartesianGrid strokeDasharray="1 0" stroke="#e5e7eb" />
                 <XAxis dataKey="category" tick={{ fontSize: 10 }} />
                 <YAxis tick={{ fontSize: 10 }} />
                 <Tooltip />
                 <Legend />
-                <Bar dataKey="spent" fill="#6366f1" />
+                <Bar dataKey="spent" fill="#64748b" />
                 <Bar dataKey="budget" fill="#cbd5e1" />
               </BarChart>
             </ResponsiveContainer>
@@ -227,50 +260,9 @@ const Home = () => {
         </div>
       </section>
 
-      <section className="dashboard-home-grid">
-        <div className="ui-card">
-          <h3 style={{ marginBottom: '8px' }}>Goal Buckets</h3>
-          <form className="form-grid cols-3" onSubmit={onCreateGoal} style={{ marginBottom: '10px' }}>
-            <div className="form-field">
-              <label>Goal title</label>
-              <input value={goalTitle} onChange={(e) => setGoalTitle(e.target.value)} placeholder="Emergency Fund" />
-            </div>
-            <div className="form-field">
-              <label>Target amount</label>
-              <input type="number" min="1" value={goalTarget} onChange={(e) => setGoalTarget(e.target.value)} placeholder="50000" />
-            </div>
-            <div className="form-field">
-              <label>Deadline</label>
-              <input type="date" value={goalDeadline} onChange={(e) => setGoalDeadline(e.target.value)} />
-            </div>
-            <div>
-              <button className="btn-primary" type="submit">Add Goal</button>
-            </div>
-          </form>
-
-          <div className="goals-list">
-            {goals.length ? goals.map((goal) => (
-              <div key={goal._id} className="goal-item">
-                <div className="goal-head">
-                  <strong>{goal.title}</strong>
-                  <small>{Math.round(goal.currentAmount).toLocaleString()} / {Math.round(goal.targetAmount).toLocaleString()}</small>
-                </div>
-                <div className="budget-meter" style={{ marginTop: 2 }}>
-                  <span style={{ width: `${Math.min(goal.progressPercent || 0, 100)}%` }} />
-                </div>
-                <div className="goal-actions">
-                  <button className="btn-secondary" onClick={() => addGoalProgress(goal, 100)}>+100</button>
-                  <button className="btn-secondary" onClick={() => addGoalProgress(goal, 500)}>+500</button>
-                  <button className="btn-secondary" onClick={() => updateGoal(goal._id, { status: 'completed' })}>Complete</button>
-                  <button className="btn-danger" onClick={() => deleteGoal(goal._id)}>Delete</button>
-                </div>
-              </div>
-            )) : <p className="empty-hint">No goals yet. Create your first savings target.</p>}
-          </div>
-        </div>
-
-        <div className="ui-card">
-          <h3 style={{ marginBottom: '8px' }}>Smart Insights</h3>
+      <section className="dashboard-home-grid single-column">
+        <div className="ui-card fade-in">
+          <h3 className="section-heading">Smart Insights</h3>
           <div className="insights-list">
             {insights?.insights?.length ? insights.insights.map((item) => (
               <div key={item.code} className={`insight-item-card ${item.severity || 'info'}`}>
@@ -280,19 +272,19 @@ const Home = () => {
             )) : <p className="empty-hint">Insights will appear after more activity.</p>}
           </div>
 
-          <h3 style={{ margin: '12px 0 8px' }}>Recurring Bills Due</h3>
+          <h3 className="section-heading mt-12">Recurring Bills Due</h3>
           {recurringAlerts?.dueCount > 0 ? (
             <div className="recurring-due-list">
               {recurringAlerts.items.slice(0, 5).map((item) => (
                 <div key={item._id} className="recurring-due-item">
                   <div>
                     <strong>{item.title}</strong>
-                    <small>{new Date(item.nextDueDate).toLocaleDateString()} • {item.frequency}</small>
+                    <small>{new Date(item.nextDueDate).toLocaleDateString()} - {item.frequency}</small>
                   </div>
                   <span>Rs {Math.round(item.amount).toLocaleString()}</span>
                 </div>
               ))}
-              <button className="btn-primary" style={{ marginTop: '8px' }} onClick={processRecurringDue}>
+              <button className="btn-primary mt-8" onClick={processRecurringDue}>
                 Process Auto Due Bills
               </button>
             </div>

@@ -1,0 +1,181 @@
+.ui-btn {
+  border: 1px solid transparent;
+  border-radius: var(--radius-sm);
+  padding: 8px 12px;
+  font-size: 0.82rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: transform 120ms ease, box-shadow 120ms ease, background-color 120ms ease;
+}
+
+.ui-btn:disabled {
+  opacity: 0.65;
+  cursor: not-allowed;
+}
+
+.ui-btn-primary {
+  background: linear-gradient(120deg, var(--primary), var(--primary-700));
+  color: #fff;
+}
+
+.ui-btn-primary:hover:not(:disabled) {
+  transform: translateY(-1px);
+  box-shadow: 0 8px 18px rgba(91, 97, 246, 0.24);
+}
+
+.ui-btn-secondary,
+.ui-btn-ghost {
+  background: #fff;
+  border-color: var(--border);
+  color: #1e293b;
+}
+
+.kpi-card-strong {
+  border: 1px solid #e2e8f0;
+  background: linear-gradient(160deg, #fff, #f8fbff);
+  border-radius: var(--radius-md);
+  padding: var(--space-4);
+  transition: transform 140ms ease, box-shadow 140ms ease;
+}
+
+.kpi-card-strong:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 8px 16px rgba(15, 23, 42, 0.08);
+}
+
+.kpi-title {
+  color: var(--text-muted);
+  font-size: 0.78rem;
+}
+
+.kpi-trend {
+  margin: var(--space-2) 0 0;
+  font-size: 0.8rem;
+  font-weight: 600;
+}
+
+.kpi-trend.up {
+  color: var(--expense);
+}
+
+.kpi-trend.down {
+  color: var(--income);
+}
+
+.chart-card-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  margin-bottom: var(--space-3);
+}
+
+.chart-card-body {
+  width: 100%;
+  min-height: 240px;
+}
+
+.data-table-wrap {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.data-table-head {
+  display: flex;
+  justify-content: flex-end;
+}
+
+.data-table-search {
+  width: min(320px, 100%);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: #fff;
+  padding: 9px 10px;
+  font-size: 0.85rem;
+}
+
+.data-table-search:focus {
+  outline: none;
+  border-color: var(--primary);
+  box-shadow: 0 0 0 3px rgba(91, 97, 246, 0.18);
+}
+
+.data-table-scroll {
+  overflow: auto;
+  border: 1px solid #e7edf6;
+  border-radius: var(--radius-sm);
+}
+
+.enhanced-table tbody tr:nth-child(even) {
+  background: #f8fafc;
+}
+
+.enhanced-table tbody tr:hover {
+  background: #eef4ff;
+}
+
+.th-sortable {
+  cursor: pointer;
+  user-select: none;
+}
+
+.amount-income {
+  color: var(--income);
+  font-weight: 700;
+}
+
+.amount-expense {
+  color: var(--expense);
+  font-weight: 700;
+}
+
+.empty-state-card {
+  border: 1px dashed #cbd5e1;
+  border-radius: var(--radius-md);
+  background: #f8fafc;
+  padding: var(--space-6);
+  text-align: center;
+  color: var(--text-muted);
+}
+
+.empty-state-card svg {
+  font-size: 1.4rem;
+  margin-bottom: var(--space-2);
+}
+
+.empty-state-card h4 {
+  margin: 0 0 var(--space-2);
+  color: #334155;
+}
+
+.empty-state-card p {
+  margin: 0;
+  font-size: 0.86rem;
+}
+
+.skeleton-table {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.skeleton-row {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(80px, 1fr));
+  gap: 10px;
+}
+
+.skeleton-cell {
+  height: 14px;
+  border-radius: 999px;
+  background: linear-gradient(90deg, #e5e7eb, #f1f5f9, #e5e7eb);
+  background-size: 200% 100%;
+  animation: uiSkeleton 1.2s linear infinite;
+}
+
+@keyframes uiSkeleton {
+  to {
+    background-position: -200% 0;
+  }
+}

@@ -15,6 +15,7 @@ import AdminLogin from './pages/AdminLogin';
 import Spinner from './components/Spinner';
 import Toast from './components/Toast';
 import './App.css';
+import './styles/ui.css';
 
 /**
  * Protected route component to handle authenticated routes

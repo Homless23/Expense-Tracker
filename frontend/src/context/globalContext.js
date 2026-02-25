@@ -193,14 +193,25 @@ export const GlobalProvider = ({ children }) => {
     }
   }, [getApiErrorMessage]);
 
-  const updateProfile = useCallback(async ({ name }) => {
+  const updateProfile = useCallback(async ({ name, avatarDataUrl, removeAvatar } = {}) => {
     try {
       setError(null);
-      const res = await api.put('/auth/profile', { name });
+      const payload = { name };
+      if (typeof avatarDataUrl !== 'undefined') {
+        payload.avatarDataUrl = avatarDataUrl;
+      }
+      if (typeof removeAvatar !== 'undefined') {
+        payload.removeAvatar = Boolean(removeAvatar);
+      }
+
+      const res = await api.put('/auth/profile', payload);
       const nextUser = {
         ...(user || {}),
-        name: res.data?.name || name,
-        email: res.data?.email || user?.email
+        name: res.data?.name || name || user?.name,
+        email: res.data?.email || user?.email,
+        avatarDataUrl: typeof res.data?.avatarDataUrl === 'string'
+          ? res.data.avatarDataUrl
+          : (removeAvatar ? '' : (avatarDataUrl ?? user?.avatarDataUrl ?? ''))
       };
       setUser(nextUser);
       localStorage.setItem('user', JSON.stringify(nextUser));
@@ -275,15 +286,33 @@ export const GlobalProvider = ({ children }) => {
   const addExpense = useCallback(async (expense) => {
     try {
       setError(null);
-      await api.post('/v1/add-expense', expense);
-      await getExpenses();
+      const res = await api.post('/v1/add-expense', expense);
+      const created = res?.data;
+      if (created && created._id) {
+        setExpenses((prev) => [created, ...prev.filter((item) => item._id !== created._id)]);
+        setHistoryItems((prev) => {
+          const safe = Array.isArray(prev) ? prev : [];
+          if (Number(historyPagination.page || 1) !== 1) return safe;
+          const limit = Number(historyPagination.limit) || 10;
+          return [created, ...safe.filter((item) => item._id !== created._id)].slice(0, limit);
+        });
+        setHistoryPagination((prev) => {
+          const nextTotal = Number(prev?.total || 0) + 1;
+          const limit = Number(prev?.limit || 10);
+          return {
+            ...prev,
+            total: nextTotal,
+            totalPages: Math.max(Math.ceil(nextTotal / limit), 1)
+          };
+        });
+      }
       pushNotification(`Expense added: ${expense.title}`, { type: 'success' });
-      return true;
+      return created || true;
     } catch (err) {
       setError(getApiErrorMessage(err, 'Error adding expense'));
       return false;
     }
-  }, [getApiErrorMessage, getExpenses, pushNotification]);
+  }, [getApiErrorMessage, historyPagination.limit, historyPagination.page, pushNotification]);
 
   const addTransaction = addExpense;
 

@@ -1,7 +1,10 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
+import { Area, AreaChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
 import AppShell from '../components/AppShell';
 import { useGlobalContext } from '../context/globalContext';
+import DataTable from '../components/ui/DataTable';
+import ChartCard from '../components/ui/ChartCard';
+import SkeletonTable from '../components/ui/SkeletonTable';
 import './DashboardUI.css';
 
 const History = () => {
@@ -77,31 +80,59 @@ const History = () => {
 
   const rightPanel = (
     <>
-      <div className="ui-card">
-        <h3>Spending Limits</h3>
-        <p className="muted" style={{ margin: '4px 0 8px' }}>Monthly transaction limit</p>
-        <strong style={{ fontSize: '1.7rem' }}>Rs.{Math.round(monthlyLimit).toLocaleString()}</strong>
-        <p className="muted" style={{ margin: '8px 0 4px' }}>{limitPercent.toFixed(1)}%</p>
+      <div className="ui-card fade-in">
+        <h3 className="section-heading">Spending Limits</h3>
+        <p className="muted mt-4 mb-8">Monthly transaction limit</p>
+        <strong className="stat-large">Rs.{Math.round(monthlyLimit).toLocaleString()}</strong>
+        <p className="muted mt-8 mb-4">{limitPercent.toFixed(1)}%</p>
         <div className="budget-meter">
           <span style={{ width: `${limitPercent}%` }} />
         </div>
       </div>
 
-      <div className="ui-card">
-        <h3>Expense this month</h3>
-        <div style={{ width: '100%', height: '210px' }}>
+      <ChartCard title="Expense this month">
+        <div className="chart-box h-210">
           <ResponsiveContainer>
-            <LineChart data={chartData}>
+            <AreaChart data={chartData}>
               <XAxis dataKey="day" tick={{ fontSize: 10 }} />
               <YAxis tick={{ fontSize: 10 }} />
               <Tooltip />
-              <Line type="monotone" dataKey="amount" stroke="#6366f1" strokeWidth={2} />
-            </LineChart>
+              <Area
+                type="monotone"
+                dataKey="amount"
+                stroke="#64748b"
+                fill="#e2e8f0"
+                fillOpacity={0.8}
+                strokeWidth={1.4}
+                isAnimationActive={false}
+              />
+            </AreaChart>
           </ResponsiveContainer>
         </div>
-      </div>
+      </ChartCard>
     </>
   );
+
+  const columns = useMemo(() => ([
+    { key: 'title', label: 'Transaction', sortable: true },
+    { key: 'category', label: 'Category', sortable: true },
+    {
+      key: 'date',
+      label: 'Date',
+      sortable: true,
+      render: (row) => new Date(row.date).toLocaleString()
+    },
+    {
+      key: 'amount',
+      label: 'Amount',
+      sortable: true,
+      render: (row) => (
+        <span className={(row.type || 'expense') === 'income' ? 'amount-income' : 'amount-expense'}>
+          {(row.type || 'expense') === 'income' ? '+' : '-'}Rs {Number(row.amount || 0).toLocaleString()}
+        </span>
+      )
+    }
+  ]), []);
 
   return (
     <AppShell
@@ -112,8 +143,8 @@ const History = () => {
       {historyLoading ? <div className="inline-loading">Loading transactions...</div> : null}
       {error ? <div className="error-banner">{error}</div> : null}
 
-      <section className="ui-card">
-        <div className="form-grid cols-4" style={{ marginBottom: '10px' }}>
+      <section className="ui-card fade-in">
+        <div className="form-grid cols-4 gap-bottom">
           <div className="form-field">
             <label>Start date</label>
             <input type="date" value={startDate} onChange={(e) => { setPage(1); setStartDate(e.target.value); }} />
@@ -129,44 +160,30 @@ const History = () => {
               {categories.map((item) => <option key={item._id} value={item.name}>{item.name}</option>)}
             </select>
           </div>
-          <div className="form-field" style={{ display: 'flex', alignItems: 'flex-end' }}>
+          <div className="form-field align-end">
             <button className="btn-secondary" onClick={() => { setPage(1); setStartDate(''); setEndDate(''); setCategory('All'); }}>Clear filter</button>
           </div>
         </div>
 
-        <table className="dashboard-table">
-          <thead>
-            <tr>
-              <th>Transaction</th>
-              <th>Category</th>
-              <th>Date</th>
-              <th>Amount</th>
-            </tr>
-          </thead>
-          <tbody>
-            {historyItems.map((item) => (
-              <tr key={item._id}>
-                <td>{item.title}</td>
-                <td>{item.category}</td>
-                <td>{new Date(item.date).toLocaleString()}</td>
-                <td style={{ color: (item.type || 'expense') === 'income' ? '#166534' : '#b91c1c' }}>
-                  {(item.type || 'expense') === 'income' ? '+' : '-'}Rs {Number(item.amount || 0).toLocaleString()}
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-
+        {historyLoading ? <SkeletonTable rows={8} cols={4} /> : null}
+        {!historyLoading ? (
+          <DataTable
+            columns={columns}
+            data={historyItems}
+            rowKey="_id"
+            searchable
+            searchPlaceholder="Search transactions..."
+            filterKeys={['title', 'category']}
+            initialSort={{ key: 'date', dir: 'desc' }}
+            pageSize={8}
+            emptyTitle="No transactions found"
+            emptyDescription="Try a different filter or add your first transaction."
+          />
+        ) : null}
         <div className="pagination-bar">
-          <button className="btn-secondary" onClick={() => setPage((p) => Math.max(p - 1, 1))} disabled={page <= 1}>Prev</button>
-          <span className="muted">Page {historyPagination.page} of {historyPagination.totalPages}</span>
-          <button
-            className="btn-secondary"
-            onClick={() => setPage((p) => Math.min(p + 1, historyPagination.totalPages))}
-            disabled={page >= historyPagination.totalPages}
-          >
-            Next
-          </button>
+          <span className="muted">Server page {historyPagination.page} of {historyPagination.totalPages}</span>
+          <button className="btn-secondary" onClick={() => setPage((p) => Math.max(p - 1, 1))} disabled={page <= 1}>Prev server page</button>
+          <button className="btn-secondary" onClick={() => setPage((p) => Math.min(p + 1, historyPagination.totalPages))} disabled={page >= historyPagination.totalPages}>Next server page</button>
         </div>
       </section>
     </AppShell>
